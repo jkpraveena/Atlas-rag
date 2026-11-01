@@ -1,0 +1,43 @@
+services:
+  # One-shot init: ingests all three chunking strategies into the shared,
+  # persisted Chroma volume. docs_corpus/ ships baked into the image (it's
+  # committed to the repo, same as the golden Q&A set -- see the README's
+  # data provenance note), so no live fetch happens here by default.
+  init:
+    build: .
+    command: ["python", "scripts/ingest.py"]
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    volumes:
+      - rag_data:/app/data
+
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    volumes:
+      - rag_data:/app/data
+    depends_on:
+      init:
+        condition: service_completed_successfully
+
+  ui:
+    build: .
+    command: ["streamlit", "run", "streamlit_app.py", "--server.address", "0.0.0.0", "--server.port", "8501"]
+    ports:
+      - "8501:8501"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    volumes:
+      - rag_data:/app/data
+    depends_on:
+      init:
+        condition: service_completed_successfully
+
+volumes:
+  rag_data:
