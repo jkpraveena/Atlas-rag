@@ -1,130 +1,132 @@
-Hybrid RAG Search Pipeline
+**Hybrid RAG Search Pipeline**
 
-A retrieval-augmented generation (RAG) system for searching technical documentation using hybrid retrieval, configurable document chunking, evidence-grounded answer generation, citation verification, and retrieval-confidence evaluation.
+A modular Retrieval-Augmented Generation (RAG) system that combines dense vector search, sparse keyword retrieval, document reranking, grounded answer generation, citation verification, and retrieval-confidence evaluation.
 
-The system combines dense vector search using ChromaDB with sparse keyword retrieval using BM25. Reciprocal Rank Fusion (RRF) combines the results, followed by reranking, grounded answer generation, and citation verification. A confidence-based retrieval gate prevents the system from generating answers when sufficient supporting evidence is unavailable.
+Built using Python, LangGraph, ChromaDB, BM25, FastAPI, and Streamlit, the system explores practical approaches to improving retrieval relevance, answer reliability, and hallucination prevention.
 
-Key Features
+**Key Features**
 
-* Hybrid Retrieval: Combines dense vector search and BM25 sparse keyword retrieval using Reciprocal Rank Fusion.
-* Multiple Chunking Strategies: Implements fixed-size, structure-aware, and semantic chunking with an automated evaluation framework.
-* Grounded Answer Generation: Generates answers using retrieved document context with inline source citations.
+* Hybrid Retrieval: Combines dense vector search and BM25 sparse keyword retrieval using Reciprocal Rank Fusion (RRF).
+* Configurable Chunking: Implements fixed-size, structure-aware, and semantic chunking strategies.
+* Reranking: Reorders retrieved candidates based on relevance.
+* Grounded Generation: Generates answers using retrieved document context with inline citations.
 * Citation Verification: Validates individual citations against their corresponding source documents.
-* Retrieval Confidence Gating: Evaluates retrieval quality before generation and abstains when supporting evidence is insufficient.
-* LangGraph Orchestration: Coordinates retrieval, fusion, reranking, generation, and verification stages.
-* Vector Database: Uses ChromaDB for persistent vector storage and similarity search.
-* REST API: Exposes retrieval and evaluation functionality through FastAPI.
+* Confidence-Based Abstention: Prevents answer generation when retrieved evidence is insufficient.
+* LangGraph Orchestration: Coordinates retrieval, fusion, reranking, generation, and verification.
+* Vector Storage: Uses ChromaDB for persistent vector indexing and similarity search.
+* Evaluation Framework: Compares retrieval and answer quality across different chunking strategies.
+* REST API: Exposes pipeline functionality through FastAPI.
 * Interactive Interface: Provides document querying, retrieval comparison, and evaluation through Streamlit.
-* Automated Testing: Includes unit and integration tests covering core pipeline components.
+* Automated Testing: Includes unit and integration tests using pytest.
 
-Dataset and Knowledge Corpus
+**Knowledge Corpus**
 
-The system uses FastAPI’s official tutorial documentation as its knowledge corpus.
+The system uses the official FastAPI tutorial documentation as its knowledge corpus.
 
-* Source: fastapi/fastapi
+* Source: FastAPI Repository
 * Version: 0.104.1
 * License: MIT
-* Corpus: 28 Markdown documentation files.
-* Golden Evaluation Dataset: 37 manually authored question-answer pairs.
+* Documents: 28 Markdown files
+* Evaluation Dataset: 37 manually authored question-answer pairs
 
-The corpus is retrieved using scripts/fetch_docs.py. The script resolves embedded code references and produces self-contained Markdown documents.
+The documentation is collected using scripts/fetch_docs.py, which also resolves embedded code references to produce self-contained Markdown documents.
 
-The evaluation dataset in golden_qa/qa_v1.json contains:
+The golden evaluation dataset contains:
 
-Question Category	Count
+Category	Questions
 Direct information retrieval	15
 Multi-hop questions	8
 Unanswerable questions	8
 Ambiguous questions	6
 Total	37
 
-The expected answers are manually prepared and checked against the source documentation.
+Expected answers are manually prepared and checked against the source documentation.
 
-See docs_corpus/MANIFEST.md for documentation provenance and source details.
+Refer to docs_corpus/MANIFEST.md for source details and documentation provenance.
 
-Architecture
+**System Architecture**
 
-The pipeline follows a modular retrieval and generation architecture.
+                   User Query
+                       |
+                       v
+                Query Processing
+                       |
+              +--------+--------+
+              |                 |
+              v                 v
+        Dense Retrieval    Sparse Retrieval
+          ChromaDB              BM25
+              |                 |
+              +--------+--------+
+                       |
+                       v
+             Reciprocal Rank Fusion
+                  (RRF)
+                       |
+                       v
+                   Reranking
+                       |
+                       v
+              Confidence Evaluation
+                       |
+                +------+------+
+                |             |
+                v             v
+          Sufficient      Insufficient
+           Evidence         Evidence
+                |             |
+                v             v
+          Answer Gen.      Abstention
+                |
+                v
+        Citation Verification
+                |
+                v
+        Confidence Scoring
+                |
+                v
+            Final Answer
 
-                 User Query
-                      |
-                      v
-              Query Processing
-                      |
-             +--------+--------+
-             |                 |
-             v                 v
-       Dense Retrieval    Sparse Retrieval
-          ChromaDB             BM25
-             |                 |
-             +--------+--------+
-                      |
-                      v
-           Reciprocal Rank Fusion
-                (RRF: 0.7/0.3)
-                      |
-                      v
-                  Reranking
-                      |
-                      v
-             Confidence Evaluation
-                      |
-              +-------+-------+
-              |               |
-          Sufficient       Insufficient
-           Evidence          Evidence
-              |               |
-              v               v
-        Answer Generation   Abstention
-              |
-              v
-       Citation Verification
-              |
-              v
-       Confidence Scoring
-              |
-              v
-          Final Answer
+**Retrieval Pipeline**
 
-Retrieval
-
-The system implements two complementary retrieval methods:
-
-Dense Retrieval
+1. Dense Retrieval
 
 * Uses ChromaDB for vector storage.
 * Performs cosine-similarity-based retrieval.
-* Supports semantic matching between queries and document chunks.
+* Identifies semantically related document chunks.
 
-Sparse Retrieval
+2. Sparse Retrieval
 
-* Uses BM25 for keyword-based document retrieval.
-* Captures exact terms and technical keywords.
-* Complements semantic retrieval when exact terminology matters.
+* Uses BM25 for keyword-based retrieval.
+* Captures exact terminology and technical keywords.
+* Complements semantic retrieval.
 
-Reciprocal Rank Fusion
+3. Reciprocal Rank Fusion
 
-Combines the rankings from both retrieval methods using configurable weights. The default configuration assigns 0.7 to dense retrieval and 0.3 to sparse retrieval.
+Combines dense and sparse retrieval rankings using configurable weights.
 
-Reranking
+Default configuration:
+
+* Dense retrieval: 0.7
+* Sparse retrieval: 0.3
+
+4. Reranking
 
 Retrieved candidates pass through a reranking stage to improve the relevance of the final context.
 
-The project includes a lexical-overlap implementation for offline execution and an LLM-based reranking option.
+The implementation supports lexical-overlap reranking and an LLM-based reranking option.
 
-Grounded Generation
+5. Grounded Answer Generation
 
-The generation stage constructs answers using retrieved document context.
+Generates answers using retrieved document context and includes inline citations such as [1] and [2].
 
-Answers include inline citations such as [1] and [2], allowing users to trace individual claims back to their supporting documents.
+6. Citation Verification
 
-Citation Verification
+Checks individual citations against their corresponding source documents to determine whether the cited evidence supports the associated claims.
 
-Each citation is checked against its corresponding source document to evaluate whether the cited content supports the associated claim.
+7. Retrieval Confidence
 
-Retrieval Confidence
-
-Before generating an answer, the system evaluates retrieval quality.
+Evaluates retrieval quality before answer generation.
 
 The confidence mechanism considers:
 
@@ -132,30 +134,28 @@ The confidence mechanism considers:
 * Citation coverage.
 * Answer completeness.
 
-If retrieval confidence falls below the configured threshold, the system abstains instead of generating an unsupported answer.
+When retrieval confidence falls below the configured threshold, the system abstains instead of generating an unsupported answer.
 
 Chunking Strategies and Evaluation
 
 Three document chunking strategies are implemented:
 
 Strategy	Description
-Fixed-size	Divides documents into chunks using predefined size and overlap settings.
-Structure-aware	Uses document structure, headings, and content boundaries to create chunks.
-Semantic	Uses semantic similarity to determine appropriate chunk boundaries.
+Fixed-size	Divides documents using predefined chunk sizes and overlap.
+Structure-aware	Uses headings, paragraphs, and document boundaries.
+Semantic	Uses semantic similarity to determine chunk boundaries.
 
-The evaluation framework compares these strategies against the 37-question golden dataset.
+The evaluation framework compares all three strategies against the 37-question golden dataset.
 
-Metrics include:
+Evaluation metrics include:
 
-* Pass rate.
-* Answer correctness.
-* Faithfulness.
-* Retrieval relevance.
-* Citation accuracy.
+* Pass rate
+* Answer correctness
+* Faithfulness
+* Retrieval relevance
+* Citation accuracy
 
-The comparison identifies the best-performing strategy for each evaluation metric.
-
-Observed offline evaluation results:
+Observed Offline Evaluation Results
 
 Strategy	Pass Rate	Correctness	Faithfulness	Citation Accuracy
 Fixed-size	0.24	0.32	0.62	0.56
@@ -166,17 +166,15 @@ Structure-aware chunking performed best across the reported metrics in this exec
 
 These results are specific to the current offline configuration and should not be interpreted as universal performance rankings.
 
-Run the comparison again after switching to real embedding and generation providers to evaluate how the results change.
+Hallucination Prevention
 
-Hallucination-Aware Retrieval
+The system incorporates a retrieval-confidence gate to determine whether sufficient supporting evidence exists before generating an answer.
 
-An important design consideration is determining when the system should answer and when it should abstain.
+During development, the initial implementation attempted to generate answers even when retrieval returned insufficient evidence. This produced unsupported responses for unanswerable questions.
 
-During development, the initial implementation attempted to generate an answer even when retrieval returned insufficient evidence. This resulted in unsupported responses for unanswerable evaluation questions.
+A confidence-based abstention mechanism was introduced to address this limitation.
 
-The retrieval-confidence mechanism was introduced to address this problem.
-
-The configured confidence threshold is 0.25.
+The configured threshold is 0.25.
 
 When retrieval confidence falls below the threshold, the system returns an insufficient-information response without invoking the generation stage.
 
@@ -187,43 +185,43 @@ This approach:
 * Improves handling of unanswerable questions.
 * Makes retrieval quality an explicit part of answer generation.
 
-The threshold is calibrated against the golden evaluation dataset and is not guaranteed to generalize to other corpora.
+The threshold is calibrated against the golden evaluation dataset and may require adjustment for other corpora.
 
-Technology Stack
+**Technology Stack**
 
 Component	Technology
-Language	Python
-API Framework	FastAPI
+Programming Language	Python
+Backend	FastAPI
 Frontend	Streamlit
 Orchestration	LangGraph
 Vector Database	ChromaDB
 Sparse Retrieval	BM25
 Ranking	Reciprocal Rank Fusion
-Embeddings	Mock hashing / OpenAI
+Embeddings	Hashing-based / OpenAI
 Reranking	Lexical / LLM-based
 Generation	Extractive / OpenAI / Anthropic
-Evaluation	Custom golden-set evaluation
+Evaluation	Custom Golden Dataset
 Testing	pytest
+Database	SQLite
 Containerization	Docker, Docker Compose
-Storage	SQLite
 
 Offline and Real Provider Configurations
 
 The project supports offline mock implementations and real provider integrations.
 
-The default configuration uses:
+Default offline configuration:
 
-Component	Offline Implementation
+Component	Implementation
 Embeddings	Hashing-based vectorization
 Reranking	Lexical overlap
 Generation	Extractive generation
 Vector Storage	ChromaDB
 
-The hashing-based embedding implementation provides deterministic, vocabulary-dependent vectors, allowing retrieval experiments without external API dependencies.
+The hashing-based embedding implementation produces deterministic, vocabulary-dependent vectors, allowing retrieval experiments without external API credentials.
 
 Real provider integrations are also available for embeddings, reranking, generation, and citation verification.
 
-Getting Started
+**Getting Started**
 
 Prerequisites
 
@@ -231,31 +229,27 @@ Prerequisites
 * pip
 * Git
 
-Installation
+1. Clone the Repository
 
-Clone the repository:
+git clone https://github.com/jkpraveena/Atlas-rag.git
+cd Atlas-rag
 
-git clone https://github.com/YOUR_USERNAME/rag-hybrid-search-pipeline.git
-cd rag-hybrid-search-pipeline
-
-Create and activate a virtual environment:
+2. Create a Virtual Environment
 
 python3 -m venv .venv
 source .venv/bin/activate
 
-Install dependencies:
+3. Install Dependencies
 
 pip install -r requirements.txt
 
-Document Ingestion
-
-Process the documentation corpus and index all three chunking strategies:
+4. Ingest Documents
 
 python scripts/ingest.py
 
-This performs document loading, chunking, embedding, deduplication, and vector indexing.
+This processes the documentation corpus, generates chunks, creates embeddings, performs deduplication, and indexes the documents using all three chunking strategies.
 
-Run the Demonstration
+5. Run the Demonstration
 
 python scripts/run_demo.py
 
@@ -264,15 +258,13 @@ The demonstration covers:
 1. Grounded answer generation with citations.
 2. Hybrid retrieval versus dense-only retrieval.
 3. Handling questions outside the indexed corpus.
-4. Comparison of the three chunking strategies.
+4. Chunking strategy comparison.
 
-Run Automated Tests
+6. Run Automated Tests
 
 pytest tests/ -v
 
-The test suite covers retrieval, chunking, confidence evaluation, citation verification, API endpoints, and other pipeline components.
-
-Start the FastAPI Server
+7. Start the FastAPI Server
 
 uvicorn src.api:app --reload
 
@@ -280,7 +272,7 @@ API documentation:
 
 http://localhost:8000/docs
 
-Start the Streamlit Application
+8. Start the Streamlit Application
 
 Open another terminal:
 
@@ -299,8 +291,8 @@ GET	/v1/documents	Retrieve indexed documents
 POST	/v1/ingest	Ingest and index documents
 GET	/v1/queries/{id}	Retrieve query history by ID
 GET	/v1/queries	Retrieve query history
-GET	/v1/eval/run	Execute evaluation for a chunking strategy
-GET	/v1/eval/chunking-comparison	Compare all chunking strategies
+GET	/v1/eval/run	Execute evaluation
+GET	/v1/eval/chunking-comparison	Compare chunking strategies
 
 Example request:
 
@@ -312,7 +304,7 @@ Example request:
 
 Docker Deployment
 
-The project supports containerized execution using Docker Compose.
+The application supports containerized execution through Docker Compose.
 
 docker compose up --build
 
@@ -321,43 +313,29 @@ The Docker configuration includes:
 * An initialization service for document ingestion.
 * A FastAPI backend.
 * A Streamlit frontend.
-* Shared storage for the indexed document collections.
+* Shared storage for indexed document collections.
 
 Optional provider credentials can be configured through environment variables in a local .env file.
 
-Engineering Decisions
+**Engineering Decisions**
 
-Hybrid retrieval instead of dense-only search
+Hybrid Retrieval: Dense retrieval captures semantic relationships, while BM25 identifies exact technical terminology. Reciprocal Rank Fusion combines their rankings.
 
-Semantic similarity does not always capture exact technical terminology. BM25 complements dense retrieval by matching specific terms, while Reciprocal Rank Fusion combines their rankings.
+Multiple Chunking Strategies: Different chunking approaches can produce different retrieval and answer-quality outcomes. The evaluation framework measures these differences rather than assuming one strategy is universally optimal.
 
-Multiple chunking strategies
+Citation Verification: Generated citations are independently checked against their source documents instead of being automatically trusted.
 
-Different chunking approaches can produce different retrieval and answer-quality outcomes. The evaluation framework measures these differences instead of assuming one strategy is universally optimal.
+Confidence-Based Abstention: Retrieval sufficiency is evaluated before generation to reduce unsupported answers.
 
-Citation verification
+Offline-First Architecture: Mock implementations allow the pipeline to operate without external API credentials, while real provider integrations support more advanced configurations.
 
-Generated citations should not automatically be trusted. The verification stage checks whether individual cited sources support their associated claims.
+Per-Document Deduplication: Deduplication is scoped to individual source documents to reduce redundant chunks without expensive corpus-wide comparisons.
 
-Confidence-based abstention
+Asynchronous API Execution: Synchronous evaluation handlers and asynchronous question-answering handlers are separated to avoid nested event-loop execution issues.
 
-The system evaluates retrieval sufficiency before generation. This prevents unnecessary generation when the indexed corpus does not contain adequate supporting information.
+**Project Structure**
 
-Offline-first architecture
-
-Mock implementations allow the complete pipeline to be tested without external API credentials. Real provider integrations can be enabled when needed.
-
-Per-document deduplication
-
-Deduplication is scoped to individual source documents to reduce redundant chunks while avoiding expensive corpus-wide comparisons.
-
-Asynchronous orchestration and API execution
-
-The API separates synchronous evaluation handlers from asynchronous question-answering handlers to avoid nested event-loop execution issues.
-
-Project Structure
-
-rag-hybrid-search-pipeline/
+Atlas-rag/
 │
 ├── src/
 │   ├── models.py
@@ -399,15 +377,15 @@ rag-hybrid-search-pipeline/
 ├── .gitignore
 └── README.md
 
-Future Improvements
+**Future Improvements**
 
-* Evaluate retrieval performance using additional technical documentation datasets.
-* Improve embedding quality using domain-appropriate embedding models.
+* Evaluate retrieval performance across additional technical documentation datasets.
+* Integrate domain-specific embedding models.
 * Experiment with cross-encoder reranking.
-* Expand evaluation with more diverse and challenging queries.
+* Expand the golden evaluation dataset.
 * Improve confidence calibration across different document collections.
-* Add distributed caching and scalable storage options.
-* Integrate additional observability and performance monitoring.
+* Introduce distributed caching and scalable storage.
+* Extend observability and performance monitoring.
 
 License
 
